@@ -61,7 +61,7 @@ def test_chunk_response_transformation():
 
 def test_full_response_transformation():
     """
-    Tests translating a standard non-streaming response to Codex Responses format.
+    Tests translating a standard non-streaming response to stateful Codex Responses format.
     """
     openai_res = {
         "id": "chatcmpl-456",
@@ -77,14 +77,19 @@ def test_full_response_transformation():
                 },
                 "finish_reason": "stop"
             }
-        ]
+        ],
+        "usage": {
+            "prompt_tokens": 12,
+            "completion_tokens": 5,
+            "total_tokens": 17
+        }
     }
     
     codex_res = transform_full_response(openai_res, "deepseek/deepseek-coder")
     
-    assert codex_res["id"] == "chatcmpl-456"
+    assert codex_res["id"] == "resp_chatcmpl-456"
     assert codex_res["model"] == "deepseek/deepseek-coder"
-    assert codex_res["object"] == "text_completion"
-    assert len(codex_res["choices"]) == 1
-    assert codex_res["choices"][0]["text"] == "Done!"
-    assert codex_res["choices"][0]["finish_reason"] == "stop"
+    assert codex_res["object"] == "response"
+    assert codex_res["status"] == "completed"
+    assert codex_res["output"][0]["content"][0]["text"] == "Done!"
+    assert codex_res["usage"]["total_tokens"] == 17

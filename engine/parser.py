@@ -52,22 +52,36 @@ def transform_response_chunk(openai_chunk: dict, original_model_id: str) -> dict
 
 def transform_full_response(openai_res: dict, original_model_id: str) -> dict:
     """
-    Translates a standard OpenAI non-streaming response into Codex Responses format.
+    Translates a standard OpenAI non-streaming response into stateful Codex Responses format.
     """
-    choices = []
-    for choice in openai_res.get("choices", []):
-        msg = choice.get("message", {})
+    choices = openai_res.get("choices", [])
+    text = ""
+    if choices:
+        msg = choices[0].get("message", {})
         text = msg.get("content", "")
-        choices.append({
-            "text": text,
-            "index": choice.get("index", 0),
-            "finish_reason": choice.get("finish_reason", "stop")
-        })
+
+    usage = openai_res.get("usage", {}) or {}
     
     return {
-        "id": openai_res.get("id", "chatcmpl-local"),
-        "object": "text_completion",
-        "created": openai_res.get("created", 0),
+        "id": "resp_" + openai_res.get("id", "chatcmpl-local"),
+        "object": "response",
+        "status": "completed",
         "model": original_model_id,
-        "choices": choices
+        "output": [
+            {
+                "id": "item_123",
+                "type": "message",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": text
+                    }
+                ]
+            }
+        ],
+        "usage": {
+            "prompt_tokens": usage.get("prompt_tokens", 100),
+            "completion_tokens": usage.get("completion_tokens", 100),
+            "total_tokens": usage.get("total_tokens", 200)
+        }
     }

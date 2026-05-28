@@ -151,6 +151,20 @@ async def handle_responses(request: Request):
     # 3. Stream Response Mode
     if transformed_payload.get("stream", False):
         async def stream_generator():
+            import time
+            resp_id = "resp_" + str(int(time.time()))
+            
+            # A. Emit event: response.created
+            event_created = {
+                "type": "response.created",
+                "response": {
+                    "id": resp_id,
+                    "status": "in_progress",
+                    "model": model_id
+                }
+            }
+            yield f"event: response.created\ndata: {json.dumps(event_created)}\n\n"
+
             try:
                 async with client.stream(
                     "POST",
@@ -159,7 +173,11 @@ async def handle_responses(request: Request):
                     headers=headers
                 ) as r:
                     if r.status_code != 200:
-                        yield f"data: {json.dumps({'error': f'Upstream error: Status {r.status_code}'})}\n\n"
+                        event_error = {
+                            "type": "response.error",
+                            "error": {"message": f"Upstream error: Status {r.status_code}"}
+                        }
+                        yield f"event: response.error\ndata: {json.dumps(event_error)}\n\n"
                         return
 
                     # Instantiate R1 think tags filter
@@ -173,23 +191,55 @@ async def handle_responses(request: Request):
                         if line.startswith("data: "):
                             line_content = line[6:]
                             if line_content.strip() == "[DONE]":
-                                yield "data: [DONE]\n\n"
                                 continue
                             try:
                                 openai_chunk = json.loads(line_content)
-                                codex_chunk = transform_response_chunk(openai_chunk, model_id)
-                                
-                                # Intercept and filter DeepSeek-R1 thinking streams
-                                if codex_chunk["choices"] and codex_chunk["choices"][0]["text"]:
-                                    raw_text = codex_chunk["choices"][0]["text"]
-                                    filtered_text = think_filter.process(raw_text)
-                                    codex_chunk["choices"][0]["text"] = filtered_text
-
-                                yield f"data: {json.dumps(codex_chunk)}\n\n"
+                                for choice in openai_chunk.get("choices", []):
+                                    delta = choice.get("delta", {})
+                                    raw_text = delta.get("content", "")
+                                    if raw_text:
+                                        filtered_text = think_filter.process(raw_text)
+                                        if filtered_text:
+                                            # B. Emit event: response.output_text.delta
+                                            event_delta = {
+                                                "type": "response.output_text.delta",
+                                                "item_id": "item_123",
+                                                "delta": filtered_text,
+                                                "output_index": 0
+                                            }
+                                            yield f"event: response.output_text.delta\ndata: {json.dumps(event_delta)}\n\n"
                             except Exception:
                                 pass
             except Exception as e:
-                yield f"data: {json.dumps({'error': f'Proxy stream error: {str(e)}'})}\n\n"
+                event_error = {
+                    "type": "response.error",
+                    "error": {"message": f"Proxy stream error: {str(e)}"}
+                }
+                yield f"event: response.error\ndata: {json.dumps(event_error)}\n\n"
+
+            # C. Emit event: response.output_text.done
+            event_text_done = {
+                "type": "response.output_text.done",
+                "item_id": "item_123",
+                "output_index": 0
+            }
+            yield f"event: response.output_text.done\ndata: {json.dumps(event_text_done)}\n\n"
+
+            # D. Emit event: response.completed
+            event_completed = {
+                "type": "response.completed",
+                "response": {
+                    "id": resp_id,
+                    "status": "completed",
+                    "model": model_id,
+                    "usage": {
+                        "prompt_tokens": 100,
+                        "completion_tokens": 100,
+                        "total_tokens": 200
+                    }
+                }
+            }
+            yield f"event: response.completed\ndata: {json.dumps(event_completed)}\n\n"
 
         return StreamingResponse(stream_generator(), media_type="text/event-stream")
 

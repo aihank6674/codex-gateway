@@ -53,7 +53,8 @@ echo "[gateway] Safely backing up and patching ~/.codex/config.toml..."
 
 # 5. Spin up Python Proxy Daemon in background
 echo "[gateway] Launching local API Gateway Proxy Daemon on port $GATEWAY_PORT..."
-"$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/engine/main.py" > /dev/null 2>&1 &
+mkdir -p "$SCRIPT_DIR/config"
+"$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/engine/main.py" > "$SCRIPT_DIR/config/gateway.log" 2>&1 &
 PROXY_PID=$!
 
 # Define cleanup function to rollback profile injection and kill proxy daemon on exit
