@@ -126,7 +126,14 @@ async def handle_responses(request: Request):
     if not target_backend:
         # Fallback routing for standard Codex model IDs (e.g. gpt-5.5, gpt-4o) without custom prefixes
         if ENABLE_DEEPSEEK and DEEPSEEK_MODELS:
-            fallback_model = "deepseek-v4-pro" if "deepseek-v4-pro" in DEEPSEEK_MODELS else DEEPSEEK_MODELS[0]
+            # Check if user selected a mini/flash/lite standard model (like GPT-5.4-Mini)
+            is_flash_request = any(keyword in model_id.lower() for keyword in ["mini", "flash", "lite", "5.4-mini"])
+            
+            if is_flash_request and "deepseek-v4-flash" in DEEPSEEK_MODELS:
+                fallback_model = "deepseek-v4-flash"
+            else:
+                fallback_model = "deepseek-v4-pro" if "deepseek-v4-pro" in DEEPSEEK_MODELS else DEEPSEEK_MODELS[0]
+                
             target_backend = {
                 "name": "deepseek",
                 "url": "https://api.deepseek.com/v1"
