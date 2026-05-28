@@ -233,9 +233,11 @@ async def handle_responses(request: Request):
                     "status": "completed",
                     "model": model_id,
                     "usage": {
+                        "input_tokens": 100,
+                        "output_tokens": 100,
+                        "total_tokens": 200,
                         "prompt_tokens": 100,
-                        "completion_tokens": 100,
-                        "total_tokens": 200
+                        "completion_tokens": 100
                     }
                 }
             }

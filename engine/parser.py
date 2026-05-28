@@ -80,8 +80,10 @@ def transform_full_response(openai_res: dict, original_model_id: str) -> dict:
             }
         ],
         "usage": {
+            "input_tokens": usage.get("prompt_tokens", 100),
+            "output_tokens": usage.get("completion_tokens", 100),
+            "total_tokens": usage.get("total_tokens", 200),
             "prompt_tokens": usage.get("prompt_tokens", 100),
-            "completion_tokens": usage.get("completion_tokens", 100),
-            "total_tokens": usage.get("total_tokens", 200)
+            "completion_tokens": usage.get("completion_tokens", 100)
         }
     }

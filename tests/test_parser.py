@@ -92,4 +92,6 @@ def test_full_response_transformation():
     assert codex_res["object"] == "response"
     assert codex_res["status"] == "completed"
     assert codex_res["output"][0]["content"][0]["text"] == "Done!"
+    assert codex_res["usage"]["input_tokens"] == 12
+    assert codex_res["usage"]["output_tokens"] == 5
     assert codex_res["usage"]["total_tokens"] == 17
