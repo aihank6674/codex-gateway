@@ -96,6 +96,7 @@ async def handle_responses(request: Request):
     """
     try:
         codex_payload = await request.json()
+        print(f"[gateway] Incoming request: {json.dumps(codex_payload)}")
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON payload.")
 
