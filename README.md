@@ -101,7 +101,7 @@ Configure gateways dynamically to aggregate cloud and local endpoints:
 | `GATEWAY_PORT` | `8761` | Local gateway proxy execution port. |
 | `ENABLE_DEEPSEEK` | `true` | Set to true to activate Cloud DeepSeek routes. |
 | `DEEPSEEK_API_KEY` | `""` | Your official DeepSeek API credentials. |
-| `DEEPSEEK_MODELS` | `deepseek-coder,deepseek-reasoner` | Comma-separated cloud models to expose in the picker. |
+| `DEEPSEEK_MODELS` | `deepseek-v4-flash,deepseek-v4-pro` | Comma-separated cloud models to expose in the picker. |
 | `ENABLE_LOCAL_A` | `false` | Enable/Disable local runner A (e.g. LM Studio, vLLM). |
 | `LOCAL_A_NAME` | `"lm-studio"` | Model ID prefix for backend A (e.g. `lm-studio/model-id`). |
 | `LOCAL_A_BASE_URL` | `"http://localhost:1234/v1"` | Port address where backend A is running. |

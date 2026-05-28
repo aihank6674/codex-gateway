@@ -45,7 +45,7 @@ GATEWAY_PORT=8000
 ENABLE_DEEPSEEK=true
 DEEPSEEK_API_KEY="sk-your-real-deepseek-key"
 # Comma-separated list of default models to expose
-DEEPSEEK_MODELS="deepseek-coder,deepseek-reasoner,deepseek-chat"
+DEEPSEEK_MODELS="deepseek-v4-flash,deepseek-v4-pro,deepseek-chat"
 
 # ----------------- [3. Local Model Backend A (e.g., LM Studio / vLLM)] -----------------
 ENABLE_LOCAL_A=false
@@ -66,8 +66,8 @@ Upon startup, the python engine queries the `GET /v1/models` endpoint for each e
 ```json
 {
   "models": [
-    {"id": "deepseek/deepseek-coder", "name": "DeepSeek Coder (Cloud)"},
-    {"id": "deepseek/deepseek-reasoner", "name": "DeepSeek R1 (Cloud)"},
+    {"id": "deepseek/deepseek-v4-flash", "name": "DeepSeek Flash (Cloud)"},
+    {"id": "deepseek/deepseek-v4-pro", "name": "DeepSeek Pro (Cloud)"},
     {"id": "lm-studio/qwen2.5-coder-7b", "name": "Qwen 2.5 Coder 7B (Local)"}
   ]
 }

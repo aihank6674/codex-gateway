@@ -64,7 +64,7 @@
   # DeepSeek Cloud settings
   ENABLE_DEEPSEEK=true
   DEEPSEEK_API_KEY="your-deepseek-api-key"
-  DEEPSEEK_MODELS="deepseek-coder,deepseek-reasoner,deepseek-chat"
+  DEEPSEEK_MODELS="deepseek-v4-flash,deepseek-v4-pro,deepseek-chat"
 
   # Local model backends
   ENABLE_LOCAL_A=false
@@ -361,13 +361,13 @@
 
   def test_request_payload_transformation():
       codex_req = {
-          "model": "deepseek/deepseek-coder",
+          "model": "deepseek/deepseek-v4-flash",
           "prompt": "def add(a, b):",
           "max_tokens": 100,
           "stream": True
       }
-      openai_req = transform_request(codex_req, "deepseek-coder")
-      assert openai_req["model"] == "deepseek-coder"
+      openai_req = transform_request(codex_req, "deepseek-v4-flash")
+      assert openai_req["model"] == "deepseek-v4-flash"
       assert openai_req["messages"][0]["role"] == "user"
       assert openai_req["messages"][0]["content"] == "def add(a, b):"
       assert openai_req["stream"] is True
@@ -381,7 +381,7 @@
               }
           ]
       }
-      codex_chunk = transform_response_chunk(openai_chunk, "deepseek/deepseek-coder")
+      codex_chunk = transform_response_chunk(openai_chunk, "deepseek/deepseek-v4-flash")
       assert codex_chunk["choices"][0]["text"] == "return a + b"
       assert codex_chunk["choices"][0]["finish_reason"] is None
   ```
@@ -493,7 +493,7 @@
   # Load configurations
   ENABLE_DEEPSEEK = os.getenv("ENABLE_DEEPSEEK", "true").lower() == "true"
   DEEPSEEK_KEY = os.getenv("DEEPSEEK_API_KEY", "")
-  DEEPSEEK_MODELS_RAW = os.getenv("DEEPSEEK_MODELS", "deepseek-coder,deepseek-reasoner")
+  DEEPSEEK_MODELS_RAW = os.getenv("DEEPSEEK_MODELS", "deepseek-v4-flash,deepseek-v4-pro")
   DEEPSEEK_MODELS = [m.strip() for m in DEEPSEEK_MODELS_RAW.split(",") if m.strip()]
 
   LOCAL_BACKENDS = []
