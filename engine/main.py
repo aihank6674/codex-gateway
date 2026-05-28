@@ -4,18 +4,22 @@ import json
 import httpx
 import asyncio
 
-# Add parent directory to sys.path to enable absolute imports of engine modules
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# Resolve project root (parent of engine/) so all paths work regardless of CWD
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, PROJECT_ROOT)
 
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, HTMLResponse, JSONResponse
 from dotenv import load_dotenv
 
 from engine.parser import transform_request, transform_response_chunk, transform_full_response
 from engine.think_handler import ThinkStreamFilter
+from engine.stats import record_request, get_stats
+from engine.dashboard import DASHBOARD_HTML
 
-# Load configurations from gateway.env
-load_dotenv("gateway.env")
+# Load configurations from gateway.env (use absolute path so it works from any CWD)
+CATALOG_PATH = os.path.join(PROJECT_ROOT, "config", "model-catalog.json")
+load_dotenv(os.path.join(PROJECT_ROOT, "gateway.env"))
 
 app = FastAPI(title="Codex Hybrid API Gateway")
 
@@ -25,7 +29,7 @@ client = httpx.AsyncClient(timeout=60.0)
 # 1. Read Cloud DeepSeek settings
 ENABLE_DEEPSEEK = os.getenv("ENABLE_DEEPSEEK", "true").lower() == "true"
 DEEPSEEK_KEY = os.getenv("DEEPSEEK_API_KEY", "")
-DEEPSEEK_MODELS_RAW = os.getenv("DEEPSEEK_MODELS", "deepseek-coder,deepseek-reasoner,deepseek-chat")
+DEEPSEEK_MODELS_RAW = os.getenv("DEEPSEEK_MODELS", "deepseek-v4-flash,deepseek-v4-pro")
 DEEPSEEK_MODELS = [m.strip() for m in DEEPSEEK_MODELS_RAW.split(",") if m.strip()]
 
 # 2. Read Local Backend settings
@@ -81,11 +85,23 @@ async def aggregate_catalog():
             print(f"[catalog] Warning: Failed querying local backend '{backend['name']}': {e}")
 
     # Write output to dynamic directory
-    os.makedirs("config", exist_ok=True)
-    with open("config/model-catalog.json", "w", encoding="utf-8") as f:
+    os.makedirs(os.path.join(PROJECT_ROOT, "config"), exist_ok=True)
+    with open(CATALOG_PATH, "w", encoding="utf-8") as f:
         json.dump(catalog, f, indent=2)
     
     print(f"[catalog] Completed. Unified catalog contains {len(catalog['models'])} models.")
+
+@app.get("/", response_class=HTMLResponse)
+async def dashboard():
+    """Serve the real-time monitoring dashboard."""
+    return HTMLResponse(content=DASHBOARD_HTML)
+
+
+@app.get("/v1/stats")
+async def stats_endpoint():
+    """Return current proxy stats as JSON for dashboard auto-refresh."""
+    return JSONResponse(content=get_stats())
+
 
 @app.get("/v1/models")
 async def list_models():
@@ -93,9 +109,9 @@ async def list_models():
     Returns the custom models catalog dynamically from our unified model aggregated lists.
     """
     models_list = []
-    if os.path.exists("config/model-catalog.json"):
+    if os.path.exists(CATALOG_PATH):
         try:
-            with open("config/model-catalog.json", "r", encoding="utf-8") as f:
+            with open(CATALOG_PATH, "r", encoding="utf-8") as f:
                 catalog = json.load(f)
                 for m in catalog.get("models", []):
                     models_list.append({
@@ -162,9 +178,9 @@ async def handle_responses(request: Request):
         # Fallback routing for standard Codex model IDs (e.g. gpt-5.5, gpt-4o) without custom prefixes
         # Load catalog dynamically to classify active models
         catalog_models = []
-        if os.path.exists("config/model-catalog.json"):
+        if os.path.exists(CATALOG_PATH):
             try:
-                with open("config/model-catalog.json", "r", encoding="utf-8") as f:
+                with open(CATALOG_PATH, "r", encoding="utf-8") as f:
                     catalog = json.load(f)
                     catalog_models = catalog.get("models", [])
             except Exception:
@@ -224,6 +240,24 @@ async def handle_responses(request: Request):
 
     # 1. Transform Codex layout to standard chat completions request
     transformed_payload = transform_request(codex_payload, target_model)
+
+    stream_mode = transformed_payload.get('stream', False)
+
+    # Record to in-memory stats for the dashboard
+    record_request(
+        client_model=model_id,
+        target_backend=target_backend['name'],
+        target_model=target_model,
+        stream=stream_mode,
+    )
+
+    print("----------------------------------------------------------------------")
+    print(f"🎯 [PROXY SUCCESS] Incoming request processed!")
+    print(f"   📥 Client Selection: {model_id}")
+    print(f"   🔀 Routed Backend:   {target_backend['name'].upper()} ({target_backend['url']})")
+    print(f"   📤 Target Model:     {target_model}")
+    print(f"   🔄 Stream Mode:      {stream_mode}")
+    print("----------------------------------------------------------------------")
 
     # 2. Build headers
     headers = {"Content-Type": "application/json"}

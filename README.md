@@ -1,6 +1,6 @@
 # codex-gateway 🚀
 
-[![Build Status](https://img.shields.io/badge/tests-7%20passed-brightgreen.svg)](https://github.com/aihank6674/codex-gateway)
+[![Build Status](https://img.shields.io/badge/tests-8%20passed-brightgreen.svg)](https://github.com/aihank6674/codex-gateway)
 [![Python Version](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11-blue.svg)](https://www.python.org/)
 [![Framework](https://img.shields.io/badge/framework-FastAPI-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -15,9 +15,12 @@ By translating proprietary Codex "Responses API" payloads into standard "Chat Co
 
 ```mermaid
 graph TD
-    A[Codex Desktop GUI] -->|Proprietary Responses API| B[Local codex-gateway :8000]
+    A[Codex Desktop GUI] -->|Proprietary Responses API| B[Local codex-gateway :8761]
     
     B -->|Prefix Parsing & Dispatching| C{Backend Router}
+    
+    B -->|GET /v1/models| K[Dynamic Models Aggregator]
+    K -->|Aggregate Active Catalog| A
     
     C -->|deepseek/*| D[Cloud DeepSeek API]
     C -->|lm-studio/*| E[Local LM Studio Engine]
@@ -80,7 +83,7 @@ Configure gateways dynamically to aggregate cloud and local endpoints:
 
 | Variable | Default Value | Description |
 | :--- | :--- | :--- |
-| `GATEWAY_PORT` | `8000` | Local gateway proxy execution port. |
+| `GATEWAY_PORT` | `8761` | Local gateway proxy execution port. |
 | `ENABLE_DEEPSEEK` | `true` | Set to true to activate Cloud DeepSeek routes. |
 | `DEEPSEEK_API_KEY` | `""` | Your official DeepSeek API credentials. |
 | `DEEPSEEK_MODELS` | `deepseek-coder,deepseek-reasoner` | Comma-separated cloud models to expose in the picker. |
@@ -109,15 +112,16 @@ pytest tests/ -v
 
 ### Passing Tests Output:
 ```text
-tests/test_configurator.py::test_patch_and_rollback PASSED               [ 14%]
-tests/test_parser.py::test_request_payload_transformation PASSED         [ 28%]
-tests/test_parser.py::test_chunk_response_transformation PASSED          [ 42%]
-tests/test_parser.py::test_full_response_transformation PASSED           [ 57%]
-tests/test_think_handler.py::test_discard_think_blocks PASSED            [ 71%]
-tests/test_think_handler.py::test_format_think_blocks PASSED             [ 85%]
+tests/test_configurator.py::test_patch_and_rollback PASSED               [ 12%]
+tests/test_parser.py::test_request_payload_transformation PASSED         [ 25%]
+tests/test_parser.py::test_chunk_response_transformation PASSED          [ 37%]
+tests/test_parser.py::test_full_response_transformation PASSED           [ 50%]
+tests/test_parser.py::test_request_input_array_transformation PASSED     [ 62%]
+tests/test_think_handler.py::test_discard_think_blocks PASSED            [ 75%]
+tests/test_think_handler.py::test_format_think_blocks PASSED             [ 87%]
 tests/test_think_handler.py::test_partial_tag_buffering PASSED           [100%]
 
-============================== 7 passed in 0.03s ===============================
+============================== 8 passed in 0.03s ===============================
 ```
 
 ---

@@ -11,7 +11,7 @@ def test_request_payload_transformation():
     Tests transforming a proprietary Codex prompt payload to a standard OpenAI chat request.
     """
     codex_payload = {
-        "model": "deepseek/deepseek-coder",
+        "model": "deepseek/deepseek-v4-flash",
         "prompt": "import math\ndef is_prime(n):",
         "temperature": 0.1,
         "max_tokens": 150,
@@ -19,9 +19,9 @@ def test_request_payload_transformation():
         "system": "You are a helpful software engineer assistant."
     }
     
-    openai_req = transform_request(codex_payload, "deepseek-coder")
+    openai_req = transform_request(codex_payload, "deepseek-v4-flash")
     
-    assert openai_req["model"] == "deepseek-coder"
+    assert openai_req["model"] == "deepseek-v4-flash"
     assert openai_req["temperature"] == 0.1
     assert openai_req["max_tokens"] == 150
     assert openai_req["stream"] is True
@@ -39,7 +39,7 @@ def test_chunk_response_transformation():
         "id": "chatcmpl-123",
         "object": "chat.completion.chunk",
         "created": 1677649420,
-        "model": "deepseek-coder",
+        "model": "deepseek-v4-flash",
         "choices": [
             {
                 "index": 0,
@@ -49,10 +49,10 @@ def test_chunk_response_transformation():
         ]
     }
     
-    codex_chunk = transform_response_chunk(openai_chunk, "deepseek/deepseek-coder")
+    codex_chunk = transform_response_chunk(openai_chunk, "deepseek/deepseek-v4-flash")
     
     assert codex_chunk["id"] == "chatcmpl-123"
-    assert codex_chunk["model"] == "deepseek/deepseek-coder"
+    assert codex_chunk["model"] == "deepseek/deepseek-v4-flash"
     assert codex_chunk["object"] == "text_completion.chunk"
     assert len(codex_chunk["choices"]) == 1
     assert codex_chunk["choices"][0]["text"] == "\n    if n <= 1: return False"
@@ -67,7 +67,7 @@ def test_full_response_transformation():
         "id": "chatcmpl-456",
         "object": "chat.completion",
         "created": 1677649430,
-        "model": "deepseek-coder",
+        "model": "deepseek-v4-flash",
         "choices": [
             {
                 "index": 0,
@@ -85,10 +85,10 @@ def test_full_response_transformation():
         }
     }
     
-    codex_res = transform_full_response(openai_res, "deepseek/deepseek-coder")
+    codex_res = transform_full_response(openai_res, "deepseek/deepseek-v4-flash")
     
     assert codex_res["id"] == "resp_chatcmpl-456"
-    assert codex_res["model"] == "deepseek/deepseek-coder"
+    assert codex_res["model"] == "deepseek/deepseek-v4-flash"
     assert codex_res["object"] == "response"
     assert codex_res["status"] == "completed"
     assert codex_res["output"][0]["content"][0]["text"] == "Done!"
@@ -101,7 +101,7 @@ def test_request_input_array_transformation():
     Tests transforming a stateful input array containing developer and user messages into Chat messages.
     """
     codex_payload = {
-        "model": "deepseek/deepseek-coder",
+        "model": "deepseek/deepseek-v4-flash",
         "input": [
             {
                 "role": "developer",
@@ -117,9 +117,9 @@ def test_request_input_array_transformation():
         "stream": False
     }
     
-    openai_req = transform_request(codex_payload, "deepseek-coder")
+    openai_req = transform_request(codex_payload, "deepseek-v4-flash")
     
-    assert openai_req["model"] == "deepseek-coder"
+    assert openai_req["model"] == "deepseek-v4-flash"
     assert openai_req["temperature"] == 0.3
     assert openai_req["max_tokens"] == 200
     assert len(openai_req["messages"]) == 2
