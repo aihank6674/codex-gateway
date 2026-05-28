@@ -153,6 +153,7 @@ async def handle_responses(request: Request):
         async def stream_generator():
             import time
             resp_id = "resp_" + str(int(time.time()))
+            full_text = ""
             
             # A. Emit event: response.created
             event_created = {
@@ -164,6 +165,21 @@ async def handle_responses(request: Request):
                 }
             }
             yield f"event: response.created\ndata: {json.dumps(event_created)}\n\n"
+
+            # A2. Emit event: response.output_item.added
+            event_item_added = {
+                "type": "response.output_item.added",
+                "response_id": resp_id,
+                "output_index": 0,
+                "item": {
+                    "id": "item_123",
+                    "type": "message",
+                    "status": "in_progress",
+                    "role": "assistant",
+                    "content": []
+                }
+            }
+            yield f"event: response.output_item.added\ndata: {json.dumps(event_item_added)}\n\n"
 
             try:
                 async with client.stream(
@@ -200,6 +216,7 @@ async def handle_responses(request: Request):
                                     if raw_text:
                                         filtered_text = think_filter.process(raw_text)
                                         if filtered_text:
+                                            full_text += filtered_text
                                             # B. Emit event: response.output_text.delta
                                             event_delta = {
                                                 "type": "response.output_text.delta",
@@ -224,6 +241,26 @@ async def handle_responses(request: Request):
                 "output_index": 0
             }
             yield f"event: response.output_text.done\ndata: {json.dumps(event_text_done)}\n\n"
+
+            # C2. Emit event: response.output_item.done
+            event_item_done = {
+                "type": "response.output_item.done",
+                "response_id": resp_id,
+                "output_index": 0,
+                "item": {
+                    "id": "item_123",
+                    "type": "message",
+                    "status": "completed",
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": full_text
+                        }
+                    ]
+                }
+            }
+            yield f"event: response.output_item.done\ndata: {json.dumps(event_item_done)}\n\n"
 
             # D. Emit event: response.completed
             event_completed = {
