@@ -70,7 +70,7 @@ cleanup() {
 }
 
 # Hook up exit signals to cleanup function
-trap cleanup EXIT INT TERM
+trap cleanup EXIT INT TERM HUP
 
 # Wait for aggregator to complete API queries and generate config/model-catalog.json
 echo "[gateway] Waiting for backend catalog query aggregation..."
