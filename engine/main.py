@@ -185,7 +185,7 @@ async def handle_responses(request: Request):
                     discard_think = "reasoner" not in target_model and "pro" not in target_model
                     think_filter = ThinkStreamFilter(discard_think=discard_think)
 
-                    async for line in r.iter_lines():
+                    async for line in r.aiter_lines():
                         if not line:
                             continue
                         if line.startswith("data: "):
