@@ -7,7 +7,6 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_TOML="$HOME/.codex/config.toml"
 CATALOG_JSON="$SCRIPT_DIR/config/model-catalog.json"
-GATEWAY_URL="http://127.0.0.1:8000/v1"
 
 echo "====================================================="
 echo "      🚀 Waking up codex-gateway Environment         "
@@ -21,6 +20,13 @@ if [ ! -f "$SCRIPT_DIR/gateway.env" ]; then
 fi
 
 source "$SCRIPT_DIR/gateway.env"
+
+# Fallback to default port if not defined
+if [ -z "$GATEWAY_PORT" ]; then
+    GATEWAY_PORT=8000
+fi
+
+GATEWAY_URL="http://127.0.0.1:$GATEWAY_PORT/v1"
 
 if [ "$ENABLE_DEEPSEEK" = "true" ] && [ -z "$DEEPSEEK_API_KEY" ]; then
     echo "[gateway] ERROR: DEEPSEEK_API_KEY is not defined in gateway.env!"
@@ -37,16 +43,16 @@ if [ ! -d "$SCRIPT_DIR/.venv" ]; then
     echo "[gateway] Dependencies installed successfully."
 fi
 
-# 3. Clean up any previous dangling process on port 8000
-echo "[gateway] Guaranteeing port 8000 is clean..."
-lsof -i :8000 -t | xargs kill -9 2>/dev/null
+# 3. Clean up any previous dangling process on the active port
+echo "[gateway] Guaranteeing port $GATEWAY_PORT is clean..."
+lsof -i :$GATEWAY_PORT -t | xargs kill -9 2>/dev/null
 
 # 4. Safe inject profile and provider into config.toml
 echo "[gateway] Safely backing up and patching ~/.codex/config.toml..."
 "$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/engine/configurator.py" --patch "$CONFIG_TOML" "$GATEWAY_URL" "$CATALOG_JSON"
 
 # 5. Spin up Python Proxy Daemon in background
-echo "[gateway] Launching local API Gateway Proxy Daemon on port 8000..."
+echo "[gateway] Launching local API Gateway Proxy Daemon on port $GATEWAY_PORT..."
 "$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/engine/main.py" > /dev/null 2>&1 &
 PROXY_PID=$!
 
@@ -57,7 +63,7 @@ cleanup() {
     echo "[gateway] Restoring original Codex config.toml configurations..."
     "$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/engine/configurator.py" --rollback "$CONFIG_TOML"
     
-    echo "[gateway] Terminating local API Gateway Proxy (PID $PROXY_PID)..."
+    echo "[gateway] Terminating local API Gateway Proxy (PID $PROXY_PID, Port $GATEWAY_PORT)..."
     kill -9 "$PROXY_PID" 2>/dev/null
     echo "[gateway] Teardown complete. Have a great day!"
 }

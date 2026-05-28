@@ -1,7 +1,12 @@
 import os
+import sys
 import json
 import httpx
 import asyncio
+
+# Add parent directory to sys.path to enable absolute imports of engine modules
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
@@ -202,5 +207,10 @@ async def handle_responses(request: Request):
 
 if __name__ == "__main__":
     import uvicorn
-    # Start proxy server locally on port 8000
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    # Start proxy server locally reading port from environment variable
+    port_env = os.getenv("GATEWAY_PORT", "8000")
+    try:
+        port = int(port_env)
+    except ValueError:
+        port = 8000
+    uvicorn.run(app, host="127.0.0.1", port=port)
