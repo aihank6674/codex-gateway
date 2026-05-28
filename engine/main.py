@@ -194,8 +194,9 @@ async def handle_responses(request: Request):
                 catalog_models.append({"id": f"{b['name']}/local-default"})
 
         if catalog_models:
-            # Check if user selected a mini/flash standard model (like GPT-5.4-Mini)
-            is_flash_request = any(keyword in model_id.lower() for keyword in ["mini", "flash", "lite", "5.4-mini"])
+            # Codex UI hardcodes standard models when wire_api="responses".
+            # We map GPT-5.4 and lower to Flash (low-tier), and GPT-5.5 to Pro (high-tier).
+            is_flash_request = any(keyword in model_id.lower() for keyword in ["mini", "flash", "lite", "5.4", "5.3", "5.2"])
             
             flash_keywords = ["mini", "flash", "lite", "fast", "coder", "qwen"]
             flash_models = [m for m in catalog_models if any(kw in m["id"].lower() for kw in flash_keywords)]

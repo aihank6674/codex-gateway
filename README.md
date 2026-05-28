@@ -48,6 +48,21 @@ graph TD
 *   **🔄 Safe Profile Injection & Rollback**: Safe, idempotent config patching for `~/.codex/config.toml` that backs up your environment on launch and completely restores it upon application exit.
 *   **🛡️ Lifecycle Daemon**: A simple execution wrapper script (`gateway.sh`) handles setting up an isolated virtual python environment, launching the proxy server, waking up Codex, and guaranteeing clean process terminations.
 
+## 🎭 UI Limitations & Model Mapping (Important!)
+
+Due to internal design choices in the official Codex Desktop application (specifically its proprietary `responses` API), **the model selection dropdown in the Codex UI is strictly hardcoded to official GPT models**. Codex Desktop will actively ignore `model_catalog_json` configurations and force the display of models like `GPT-5.5` and `GPT-5.4-Mini`.
+
+Because we cannot natively inject custom dropdown menus into the closed-source Codex client without losing advanced features, `codex-gateway` utilizes a silent **fallback routing mapping**. 
+
+You should select models in the UI based on this predefined tier mapping:
+
+| UI Selection (The "Mask") | Backend Routing (The "Reality") | Target Tier |
+| :--- | :--- | :--- |
+| **`GPT-5.5`** | **DeepSeek Pro Reasoning** (or other high-tier models) | High-Tier / Heavy Reasoning |
+| **`GPT-5.4` / `GPT-5.4-Mini`** | **DeepSeek Flash** (or other low-tier models) | Low-Tier / Fast Autocomplete |
+
+*Note: The gateway handles this translation automatically. Simply select the desired GPT tier in the UI, and the gateway will silently route your request to the appropriate DeepSeek or local model.*
+
 ---
 
 ## 🚀 Quick Start

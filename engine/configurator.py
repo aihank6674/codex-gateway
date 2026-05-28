@@ -2,6 +2,8 @@ import os
 import sys
 import shutil
 import re
+import sqlite3
+import glob
 
 def patch_config(config_path: str, gateway_url: str, catalog_path: str):
     """
@@ -44,14 +46,16 @@ def patch_config(config_path: str, gateway_url: str, catalog_path: str):
     # 3. Update the global default model_provider safely to "codex-gateway"
     if "model_provider =" in content:
         content = re.sub(
-            r"model_provider\s*=\s*\"[^\"]+\"",
-            "model_provider = \"codex-gateway\"",
-            content
+            r'^(model_provider\s*=\s*)"[^"]+"',
+            r'\1"codex-gateway"',
+            content,
+            count=1,
+            flags=re.MULTILINE
         )
     else:
-        content = "model_provider = \"codex-gateway\"\n" + content
+        content = 'model_provider = "codex-gateway"\n' + content
 
-    # 4. Append the new custom provider and profile blocks
+    # 4. Append the new custom provider block so Codex reads model_catalog_json
     patch_data = f"""
 # === START CODEX-GATEWAY ===
 [model_providers.codex-gateway]
@@ -72,6 +76,10 @@ model = "deepseek/deepseek-v4-pro"
         f.write(new_content)
     print(f"[configurator] Successfully patched config at {expanded_path}")
 
+    # 5. Migrate chat history to the gateway identity so they are visible
+    codex_home = os.path.dirname(expanded_path)
+    migrate_existing_threads(codex_home, "openai", "codex-gateway")
+
 def rollback_config(config_path: str):
     """
     Restores ~/.codex/config.toml to its original backup state and deletes the backup.
@@ -85,6 +93,43 @@ def rollback_config(config_path: str):
         print(f"[configurator] Successfully rolled back config to {expanded_path}")
     else:
         print(f"[configurator] Warning: No backup found at {backup_path} to restore.")
+
+    # Rollback chat history to the official identity so they are visible in official app
+    codex_home = os.path.dirname(expanded_path)
+    migrate_existing_threads(codex_home, "codex-gateway", "openai")
+
+def migrate_existing_threads(codex_home: str, from_provider: str, to_provider: str):
+    """
+    Dynamically toggles chat thread model_provider in state_*.sqlite databases
+    so that chat history remains visible when switching between Gateway and Official modes.
+    """
+    db_pattern = os.path.join(codex_home, "state_*.sqlite")
+    db_files = glob.glob(db_pattern)
+
+    if not db_files:
+        return
+
+    for db_path in db_files:
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+
+            cursor.execute(
+                "SELECT COUNT(*) FROM threads WHERE model_provider = ?", (from_provider,)
+            )
+            count = cursor.fetchone()[0]
+
+            if count > 0:
+                cursor.execute(
+                    "UPDATE threads SET model_provider = ? WHERE model_provider = ?",
+                    (to_provider, from_provider)
+                )
+                conn.commit()
+                print(f"[configurator] Migrated {count} chat thread(s) from '{from_provider}' to '{to_provider}' in {os.path.basename(db_path)}")
+
+            conn.close()
+        except Exception as e:
+            print(f"[configurator] Warning: Could not migrate threads in {os.path.basename(db_path)}: {e}")
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
