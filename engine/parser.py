@@ -98,7 +98,7 @@ def transform_full_response(openai_res: dict, original_model_id: str) -> dict:
                 "type": "message",
                 "content": [
                     {
-                        "type": "text",
+                        "type": "output_text",
                         "text": text
                     }
                 ]

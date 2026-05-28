@@ -404,7 +404,7 @@ async def handle_responses(request: Request):
                     "role": "assistant",
                     "content": [
                         {
-                            "type": "text",
+                            "type": "output_text",
                             "text": full_text
                         }
                     ]
