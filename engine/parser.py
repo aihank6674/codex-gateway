@@ -2,14 +2,39 @@ def transform_request(codex_payload: dict, actual_model: str) -> dict:
     """
     Transforms Codex Responses request parameters into standard OpenAI Chat Completions payload structure.
     """
-    prompt = codex_payload.get("prompt", "")
+    messages = []
     
-    # Pack prompt into user role message
-    messages = [{"role": "user", "content": prompt}]
-    
-    # Prepend optional system instructions if provided
-    if "system" in codex_payload and codex_payload["system"]:
-        messages.insert(0, {"role": "system", "content": codex_payload["system"]})
+    # 1. Map stateful "input" message array if provided (Chat Mode)
+    if "input" in codex_payload and isinstance(codex_payload["input"], list):
+        for msg in codex_payload["input"]:
+            role = msg.get("role", "user")
+            # Map developer role to standard system role
+            if role == "developer":
+                role = "system"
+                
+            raw_content = msg.get("content", "")
+            content_str = ""
+            
+            if isinstance(raw_content, list):
+                for part in raw_content:
+                    if isinstance(part, dict):
+                        if part.get("type") == "input_text":
+                            content_str += part.get("text", "")
+                        elif "text" in part:
+                            content_str += part["text"]
+            else:
+                content_str = str(raw_content)
+                
+            messages.append({"role": role, "content": content_str})
+            
+    # 2. Fallback to "prompt" parameter (Autocomplete / Inline Completion Mode)
+    else:
+        prompt = codex_payload.get("prompt", "")
+        messages = [{"role": "user", "content": prompt}]
+        
+        # Prepend system prompt if provided
+        if "system" in codex_payload and codex_payload["system"]:
+            messages.insert(0, {"role": "system", "content": codex_payload["system"]})
 
     # Assemble request payload compliant with standard OpenAI schemas
     transformed = {

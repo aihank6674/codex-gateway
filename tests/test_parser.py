@@ -95,3 +95,35 @@ def test_full_response_transformation():
     assert codex_res["usage"]["input_tokens"] == 12
     assert codex_res["usage"]["output_tokens"] == 5
     assert codex_res["usage"]["total_tokens"] == 17
+
+def test_request_input_array_transformation():
+    """
+    Tests transforming a stateful input array containing developer and user messages into Chat messages.
+    """
+    codex_payload = {
+        "model": "deepseek/deepseek-coder",
+        "input": [
+            {
+                "role": "developer",
+                "content": [{"type": "input_text", "text": "System guidance"}]
+            },
+            {
+                "role": "user",
+                "content": [{"type": "input_text", "text": "Hello world"}]
+            }
+        ],
+        "temperature": 0.3,
+        "max_tokens": 200,
+        "stream": False
+    }
+    
+    openai_req = transform_request(codex_payload, "deepseek-coder")
+    
+    assert openai_req["model"] == "deepseek-coder"
+    assert openai_req["temperature"] == 0.3
+    assert openai_req["max_tokens"] == 200
+    assert len(openai_req["messages"]) == 2
+    assert openai_req["messages"][0]["role"] == "system"
+    assert openai_req["messages"][0]["content"] == "System guidance"
+    assert openai_req["messages"][1]["role"] == "user"
+    assert openai_req["messages"][1]["content"] == "Hello world"
