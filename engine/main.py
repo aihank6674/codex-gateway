@@ -45,9 +45,13 @@ async def aggregate_catalog():
     # Integrate Cloud DeepSeek models
     if ENABLE_DEEPSEEK:
         for model in DEEPSEEK_MODELS:
-            name_suffix = "Reasoner (R1)" if "reasoner" in model else "Coder"
+            name_suffix = "Reasoner (R1)" if "reasoner" in model or "pro" in model else "Coder"
             if model == "deepseek-chat":
                 name_suffix = "General Chat (V3)"
+            elif model == "deepseek-v4-flash":
+                name_suffix = "Flash (V4)"
+            elif model == "deepseek-v4-pro":
+                name_suffix = "Pro Reasoning (V4)"
             catalog["models"].append({
                 "id": f"deepseek/{model}",
                 "name": f"DeepSeek {name_suffix} (Cloud)"
@@ -145,7 +149,7 @@ async def handle_responses(request: Request):
 
                     # Instantiate R1 think tags filter
                     # Discard think blocks in code completion to prevent agent parsing bugs
-                    discard_think = "reasoner" not in target_model
+                    discard_think = "reasoner" not in target_model and "pro" not in target_model
                     think_filter = ThinkStreamFilter(discard_think=discard_think)
 
                     async for line in r.iter_lines():

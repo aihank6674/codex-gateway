@@ -22,7 +22,7 @@ def transform_request(codex_payload: dict, actual_model: str) -> dict:
     }
 
     # Pass through standard hyperparameters if explicitly passed
-    for param in ["presence_penalty", "frequency_penalty", "stop"]:
+    for param in ["presence_penalty", "frequency_penalty", "stop", "reasoning_effort"]:
         if param in codex_payload:
             transformed[param] = codex_payload[param]
 
