@@ -160,22 +160,63 @@ async def handle_responses(request: Request):
 
     if not target_backend:
         # Fallback routing for standard Codex model IDs (e.g. gpt-5.5, gpt-4o) without custom prefixes
-        if ENABLE_DEEPSEEK and DEEPSEEK_MODELS:
-            # Check if user selected a mini/flash/lite standard model (like GPT-5.4-Mini)
+        # Load catalog dynamically to classify active models
+        catalog_models = []
+        if os.path.exists("config/model-catalog.json"):
+            try:
+                with open("config/model-catalog.json", "r", encoding="utf-8") as f:
+                    catalog = json.load(f)
+                    catalog_models = catalog.get("models", [])
+            except Exception:
+                pass
+
+        if not catalog_models:
+            if ENABLE_DEEPSEEK:
+                for model in DEEPSEEK_MODELS:
+                    catalog_models.append({"id": f"deepseek/{model}"})
+            for b in LOCAL_BACKENDS:
+                catalog_models.append({"id": f"{b['name']}/local-default"})
+
+        if catalog_models:
+            # Check if user selected a mini/flash standard model (like GPT-5.4-Mini)
             is_flash_request = any(keyword in model_id.lower() for keyword in ["mini", "flash", "lite", "5.4-mini"])
             
-            if is_flash_request and "deepseek-v4-flash" in DEEPSEEK_MODELS:
-                fallback_model = "deepseek-v4-flash"
+            flash_keywords = ["mini", "flash", "lite", "fast", "coder", "qwen"]
+            flash_models = [m for m in catalog_models if any(kw in m["id"].lower() for kw in flash_keywords)]
+            pro_models = [m for m in catalog_models if m not in flash_models]
+            
+            selected_model_id = ""
+            if is_flash_request:
+                if flash_models:
+                    selected_model_id = flash_models[0]["id"]
+                elif catalog_models:
+                    selected_model_id = catalog_models[0]["id"]
             else:
-                fallback_model = "deepseek-v4-pro" if "deepseek-v4-pro" in DEEPSEEK_MODELS else DEEPSEEK_MODELS[0]
-                
-            target_backend = {
-                "name": "deepseek",
-                "url": "https://api.deepseek.com/v1"
-            }
-            target_model = fallback_model
-            print(f"[router] Routing standard model '{model_id}' to DeepSeek fallback: '{target_model}'")
-        else:
+                if pro_models:
+                    selected_model_id = pro_models[0]["id"]
+                elif catalog_models:
+                    selected_model_id = catalog_models[0]["id"]
+            
+            # Resolve target backend and model from selected_model_id
+            if selected_model_id:
+                if selected_model_id.startswith("deepseek/"):
+                    target_backend = {
+                        "name": "deepseek",
+                        "url": "https://api.deepseek.com/v1"
+                    }
+                    target_model = selected_model_id.replace("deepseek/", "")
+                else:
+                    for b in LOCAL_BACKENDS:
+                        prefix = f"{b['name']}/"
+                        if selected_model_id.startswith(prefix):
+                            target_backend = b
+                            target_model = selected_model_id.replace(prefix, "")
+                            break
+                            
+            if target_backend:
+                print(f"[router] Routing standard model '{model_id}' to dynamic fallback: '{selected_model_id}'")
+        
+        if not target_backend:
             raise HTTPException(
                 status_code=400,
                 detail=f"Unsupported model provider routing for model ID: {model_id}"
