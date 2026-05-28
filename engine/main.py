@@ -201,6 +201,7 @@ async def handle_responses(request: Request):
                     # Discard think blocks in code completion to prevent agent parsing bugs
                     discard_think = "reasoner" not in target_model and "pro" not in target_model
                     think_filter = ThinkStreamFilter(discard_think=discard_think)
+                    in_reasoning = False
 
                     async for line in r.aiter_lines():
                         if not line:
@@ -213,9 +214,26 @@ async def handle_responses(request: Request):
                                 openai_chunk = json.loads(line_content)
                                 for choice in openai_chunk.get("choices", []):
                                     delta = choice.get("delta", {})
+                                    
+                                    # 1. Capture DeepSeek R1 reasoning stream tracing
+                                    reasoning_text = delta.get("reasoning_content", "")
                                     raw_text = delta.get("content", "")
-                                    if raw_text:
-                                        filtered_text = think_filter.process(raw_text)
+                                    
+                                    process_text = ""
+                                    if reasoning_text:
+                                        if not in_reasoning:
+                                            process_text += "<think>"
+                                            in_reasoning = True
+                                        process_text += reasoning_text
+                                    else:
+                                        if in_reasoning:
+                                            process_text += "</think>"
+                                            in_reasoning = False
+                                        if raw_text:
+                                            process_text += raw_text
+
+                                    if process_text:
+                                        filtered_text = think_filter.process(process_text)
                                         if filtered_text:
                                             full_text += filtered_text
                                             # B. Emit event: response.output_text.delta
@@ -228,6 +246,19 @@ async def handle_responses(request: Request):
                                             yield f"event: response.output_text.delta\ndata: {json.dumps(event_delta)}\n\n"
                             except Exception:
                                 pass
+
+                    # Ensure any open reasoning tags are safely closed if stream ends abruptly
+                    if in_reasoning:
+                        filtered_text = think_filter.process("</think>")
+                        if filtered_text:
+                            full_text += filtered_text
+                            event_delta = {
+                                "type": "response.output_text.delta",
+                                "item_id": "item_123",
+                                "delta": filtered_text,
+                                "output_index": 0
+                            }
+                            yield f"event: response.output_text.delta\ndata: {json.dumps(event_delta)}\n\n"
             except Exception as e:
                 event_error = {
                     "type": "response.error",
