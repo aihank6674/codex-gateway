@@ -87,6 +87,41 @@ async def aggregate_catalog():
     
     print(f"[catalog] Completed. Unified catalog contains {len(catalog['models'])} models.")
 
+@app.get("/v1/models")
+async def list_models():
+    """
+    Returns the custom models catalog dynamically from our unified model aggregated lists.
+    """
+    models_list = []
+    if os.path.exists("config/model-catalog.json"):
+        try:
+            with open("config/model-catalog.json", "r", encoding="utf-8") as f:
+                catalog = json.load(f)
+                for m in catalog.get("models", []):
+                    models_list.append({
+                        "id": m.get("id"),
+                        "object": "model",
+                        "created": 1677649420,
+                        "owned_by": m.get("id").split("/")[0] if "/" in m.get("id") else "custom"
+                    })
+        except Exception:
+            pass
+            
+    if not models_list:
+        if ENABLE_DEEPSEEK:
+            for model in DEEPSEEK_MODELS:
+                models_list.append({
+                    "id": f"deepseek/{model}",
+                    "object": "model",
+                    "created": 1677649420,
+                    "owned_by": "deepseek"
+                })
+                
+    return {
+        "object": "list",
+        "data": models_list
+    }
+
 @app.post("/v1/responses")
 async def handle_responses(request: Request):
     """
