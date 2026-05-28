@@ -62,6 +62,7 @@ model_catalog_json = "{catalog_path}"
 
 [profiles.codex-gateway]
 model_provider = "codex-gateway"
+model = "deepseek/deepseek-v4-pro"
 # === END CODEX-GATEWAY ===
 """
     
