@@ -1,0 +1,90 @@
+import os
+import sys
+
+# Ensure engine is importable
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from engine.parser import transform_request, transform_response_chunk, transform_full_response
+
+def test_request_payload_transformation():
+    """
+    Tests transforming a proprietary Codex prompt payload to a standard OpenAI chat request.
+    """
+    codex_payload = {
+        "model": "deepseek/deepseek-coder",
+        "prompt": "import math\ndef is_prime(n):",
+        "temperature": 0.1,
+        "max_tokens": 150,
+        "stream": True,
+        "system": "You are a helpful software engineer assistant."
+    }
+    
+    openai_req = transform_request(codex_payload, "deepseek-coder")
+    
+    assert openai_req["model"] == "deepseek-coder"
+    assert openai_req["temperature"] == 0.1
+    assert openai_req["max_tokens"] == 150
+    assert openai_req["stream"] is True
+    assert len(openai_req["messages"]) == 2
+    assert openai_req["messages"][0]["role"] == "system"
+    assert openai_req["messages"][0]["content"] == "You are a helpful software engineer assistant."
+    assert openai_req["messages"][1]["role"] == "user"
+    assert openai_req["messages"][1]["content"] == "import math\ndef is_prime(n):"
+
+def test_chunk_response_transformation():
+    """
+    Tests translating an OpenAI streaming chunk to Codex Responses format.
+    """
+    openai_chunk = {
+        "id": "chatcmpl-123",
+        "object": "chat.completion.chunk",
+        "created": 1677649420,
+        "model": "deepseek-coder",
+        "choices": [
+            {
+                "index": 0,
+                "delta": {"content": "\n    if n <= 1: return False"},
+                "finish_reason": None
+            }
+        ]
+    }
+    
+    codex_chunk = transform_response_chunk(openai_chunk, "deepseek/deepseek-coder")
+    
+    assert codex_chunk["id"] == "chatcmpl-123"
+    assert codex_chunk["model"] == "deepseek/deepseek-coder"
+    assert codex_chunk["object"] == "text_completion.chunk"
+    assert len(codex_chunk["choices"]) == 1
+    assert codex_chunk["choices"][0]["text"] == "\n    if n <= 1: return False"
+    assert codex_chunk["choices"][0]["index"] == 0
+    assert codex_chunk["choices"][0]["finish_reason"] is None
+
+def test_full_response_transformation():
+    """
+    Tests translating a standard non-streaming response to Codex Responses format.
+    """
+    openai_res = {
+        "id": "chatcmpl-456",
+        "object": "chat.completion",
+        "created": 1677649430,
+        "model": "deepseek-coder",
+        "choices": [
+            {
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "Done!"
+                },
+                "finish_reason": "stop"
+            }
+        ]
+    }
+    
+    codex_res = transform_full_response(openai_res, "deepseek/deepseek-coder")
+    
+    assert codex_res["id"] == "chatcmpl-456"
+    assert codex_res["model"] == "deepseek/deepseek-coder"
+    assert codex_res["object"] == "text_completion"
+    assert len(codex_res["choices"]) == 1
+    assert codex_res["choices"][0]["text"] == "Done!"
+    assert codex_res["choices"][0]["finish_reason"] == "stop"
