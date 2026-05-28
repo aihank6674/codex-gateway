@@ -123,10 +123,20 @@ async def handle_responses(request: Request):
                 break
 
     if not target_backend:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported model provider routing for model ID: {model_id}"
-        )
+        # Fallback routing for standard Codex model IDs (e.g. gpt-5.5, gpt-4o) without custom prefixes
+        if ENABLE_DEEPSEEK and DEEPSEEK_MODELS:
+            fallback_model = "deepseek-v4-pro" if "deepseek-v4-pro" in DEEPSEEK_MODELS else DEEPSEEK_MODELS[0]
+            target_backend = {
+                "name": "deepseek",
+                "url": "https://api.deepseek.com/v1"
+            }
+            target_model = fallback_model
+            print(f"[router] Routing standard model '{model_id}' to DeepSeek fallback: '{target_model}'")
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported model provider routing for model ID: {model_id}"
+            )
 
     # 1. Transform Codex layout to standard chat completions request
     transformed_payload = transform_request(codex_payload, target_model)
