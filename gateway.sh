@@ -61,6 +61,8 @@ PROXY_PID=$!
 cleanup() {
     echo ""
     echo "[gateway] Performing clean exit..."
+    # Give Codex Desktop a moment to fully flush databases and release locks
+    sleep 1.0
     echo "[gateway] Restoring original Codex config.toml configurations..."
     "$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/engine/configurator.py" --rollback "$CONFIG_TOML"
     

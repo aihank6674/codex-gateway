@@ -22,12 +22,13 @@ def test_patch_and_rollback():
     cursor.execute("""
         CREATE TABLE threads (
             id TEXT PRIMARY KEY,
-            model_provider TEXT NOT NULL
+            model_provider TEXT NOT NULL,
+            rollout_path TEXT
         )
     """)
     cursor.executemany(
-        "INSERT INTO threads VALUES (?, ?)",
-        [("t1", "openai"), ("t2", "codex-gateway")]
+        "INSERT INTO threads VALUES (?, ?, ?)",
+        [("t1", "openai", None), ("t2", "codex-gateway", None)]
     )
     conn.commit()
     conn.close()
@@ -83,26 +84,36 @@ def test_patch_and_rollback():
             os.unlink(backup_path)
 
 def test_migrate_existing_threads():
-    """Verify the dynamic toggle of threads provider."""
+    """Verify the dynamic toggle of threads provider and rollout JSONL file updates."""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, "state_5.sqlite")
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
-        # Create a minimal threads table matching Codex schema
+        # Create a threads table matching Codex schema
         cursor.execute("""
             CREATE TABLE threads (
                 id TEXT PRIMARY KEY,
-                model_provider TEXT NOT NULL
+                model_provider TEXT NOT NULL,
+                rollout_path TEXT
             )
         """)
 
+        # Create temporary session JSONL files
+        jsonl_path_1 = os.path.join(tmpdir, "rollout_t1.jsonl")
+        jsonl_path_2 = os.path.join(tmpdir, "rollout_t2.jsonl")
+
+        with open(jsonl_path_1, "w", encoding="utf-8") as f:
+            f.write('{"type":"session_meta","payload":{"id":"t1","model_provider":"codex-gateway"}}\n')
+        with open(jsonl_path_2, "w", encoding="utf-8") as f:
+            f.write('{"type":"session_meta","payload":{"id":"t2","model_provider":"openai"}}\n')
+
         # Insert test threads
         cursor.executemany(
-            "INSERT INTO threads VALUES (?, ?)",
+            "INSERT INTO threads VALUES (?, ?, ?)",
             [
-                ("t1", "codex-gateway"),
-                ("t2", "openai"),
+                ("t1", "codex-gateway", jsonl_path_1),
+                ("t2", "openai", jsonl_path_2),
             ]
         )
         conn.commit()
@@ -111,7 +122,7 @@ def test_migrate_existing_threads():
         # Run migration from openai to codex-gateway (startup)
         migrate_existing_threads(tmpdir, "openai", "codex-gateway")
 
-        # Verify all threads now have model_provider = 'codex-gateway'
+        # Verify all threads in SQLite now have model_provider = 'codex-gateway'
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT id, model_provider FROM threads ORDER BY id")
@@ -122,6 +133,15 @@ def test_migrate_existing_threads():
             ("t1", "codex-gateway"),
             ("t2", "codex-gateway"),
         ]
+
+        # Verify rollout file updates: both should be migrated to codex-gateway
+        with open(jsonl_path_1, "r", encoding="utf-8") as f:
+            content_1 = f.read()
+        with open(jsonl_path_2, "r", encoding="utf-8") as f:
+            content_2 = f.read()
+        
+        assert '"model_provider":"codex-gateway"' in content_1
+        assert '"model_provider":"codex-gateway"' in content_2
 
         # Run migration from codex-gateway to openai (shutdown)
         migrate_existing_threads(tmpdir, "codex-gateway", "openai")
@@ -136,3 +156,12 @@ def test_migrate_existing_threads():
             ("t1", "openai"),
             ("t2", "openai"),
         ]
+
+        # Verify rollout file updates: both should be migrated back to openai
+        with open(jsonl_path_1, "r", encoding="utf-8") as f:
+            content_1 = f.read()
+        with open(jsonl_path_2, "r", encoding="utf-8") as f:
+            content_2 = f.read()
+
+        assert '"model_provider":"openai"' in content_1
+        assert '"model_provider":"openai"' in content_2

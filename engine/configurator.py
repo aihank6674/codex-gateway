@@ -101,7 +101,8 @@ def rollback_config(config_path: str):
 def migrate_existing_threads(codex_home: str, from_provider: str, to_provider: str):
     """
     Dynamically toggles chat thread model_provider in state_*.sqlite databases
-    so that chat history remains visible when switching between Gateway and Official modes.
+    and their corresponding rollout JSONL session files so that chat history
+    remains visible and loadable when switching between Gateway and Official modes.
     """
     db_pattern = os.path.join(codex_home, "state_*.sqlite")
     db_files = glob.glob(db_pattern)
@@ -114,6 +115,7 @@ def migrate_existing_threads(codex_home: str, from_provider: str, to_provider: s
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
 
+            # 1. Update the SQLite threads table
             cursor.execute(
                 "SELECT COUNT(*) FROM threads WHERE model_provider = ?", (from_provider,)
             )
@@ -125,9 +127,31 @@ def migrate_existing_threads(codex_home: str, from_provider: str, to_provider: s
                     (to_provider, from_provider)
                 )
                 conn.commit()
-                print(f"[configurator] Migrated {count} chat thread(s) from '{from_provider}' to '{to_provider}' in {os.path.basename(db_path)}")
+                print(f"[configurator] Migrated {count} chat thread(s) in database from '{from_provider}' to '{to_provider}' in {os.path.basename(db_path)}")
 
+            # 2. Update the corresponding rollout JSONL files to align session metadata
+            cursor.execute("SELECT id, rollout_path FROM threads")
+            rows = cursor.fetchall()
             conn.close()
+
+            for thread_id, rollout_path in rows:
+                if rollout_path and os.path.exists(rollout_path):
+                    try:
+                        with open(rollout_path, "r", encoding="utf-8") as f:
+                            file_content = f.read()
+
+                        # Spacing-insensitive regex to capture "model_provider":"provider"
+                        pattern = rf'"model_provider"\s*:\s*"{from_provider}"'
+                        replacement = f'"model_provider":"{to_provider}"'
+
+                        new_content, sub_count = re.subn(pattern, replacement, file_content)
+                        if sub_count > 0:
+                            with open(rollout_path, "w", encoding="utf-8") as f:
+                                f.write(new_content)
+                            print(f"[configurator] Migrated rollout file for thread {thread_id}: replaced {sub_count} occurrence(s) of '{from_provider}' with '{to_provider}'")
+                    except Exception as fe:
+                        print(f"[configurator] Warning: Failed to migrate rollout file {rollout_path}: {fe}")
+
         except Exception as e:
             print(f"[configurator] Warning: Could not migrate threads in {os.path.basename(db_path)}: {e}")
 
